@@ -61,7 +61,7 @@ var listener = app.listen(process.env.PORT, function () {
   
   var http = require("http");
   setInterval(function() {
-      http.get("http://courses-track.glitch.me/");
+      http.get("http://course-track.herokuapp.com/");
   }, 300000);
   
   var transporter = nodemailer.createTransport({
