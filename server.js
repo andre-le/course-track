@@ -55,7 +55,7 @@ var listener = app.listen(process.env.PORT, function () {
   
   var http = require("http");
   setInterval(function() {
-      http.get("http://courses-track.glitch.me/");
+      http.get("http://course-track.herokuapp.com/");
   }, 300000);
   
   var transporter = nodemailer.createTransport({
@@ -136,7 +136,6 @@ function getAvail(course){
           courses.update({"course": course.course}, {"course": course.course, "available": course.availNow}, function(err, data){
             if (err)
               console.log("Cannot update data");
-            
           });
           resolve(data[0].available);
         }
@@ -157,3 +156,4 @@ function insertCourse(obj){
     }    
   });
 }
+
