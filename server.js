@@ -1,9 +1,8 @@
-// server.js
-// where your node app starts
-
-// init project
 var express = require('express');
 var app = express();
+require('./login')(app);
+require('./signup')(app);
+
 var nodemailer = require('nodemailer');
 
 var mongodb = require('mongodb');
@@ -12,27 +11,22 @@ var ObjectId = mongodb.ObjectID;
 var dburl = process.env.MONGOLAB_URI;
 
 const axios = require("axios");
-const urls = [['cse', '381', 'C'],['eng','313','I'], ['eng','313','H'], ['eng','313','G'], ['eng','313','F']];
+const urls = [['cse', '470J', 'A'],['cse','443','B'],['cse', '470J', 'B'],['fin','461','B'],['bus','284','T']
+             ,['fin','404','A']];
 
-// http://expressjs.com/en/starter/static-files.html
 app.use(express.static('public'));
-
-app.get("/login", function (request, response){
-  response.sendFile(__dirname + '/views/index.html');
-});
 
 app.get("/", function (request, response){
   response.sendFile(__dirname + '/views/index.html');
 });
 
-// http://expressjs.com/en/starter/basic-routing.html
 app.get("/api/courses", function (request, response) {
   
   var i = 0;
   var data = [];
   for (var i = 0; i < urls.length; i++){
     var url =
-    "https://ws.miamioh.edu/courseSectionV2/201910.json?campusCode=O&courseSubjectCode=" + 
+    "https://ws.miamioh.edu/courseSectionV2/202010.json?campusCode=O&courseSubjectCode=" + 
         urls[i][0] + "&courseNumber=" + urls[i][1] + "&courseSectionCode=" + urls[i][2];
     axios
     .get(url)
@@ -55,7 +49,7 @@ app.get("/api/courses", function (request, response) {
   }
 });
 
-// listen for requests :)
+// listen for requests
 var listener = app.listen(process.env.PORT, function () {
   console.log('Your app is listening on port ' + listener.address().port);
   
@@ -67,89 +61,99 @@ var listener = app.listen(process.env.PORT, function () {
   var transporter = nodemailer.createTransport({
         service: 'Gmail',
         auth: {
-            user: process.env.EMAIL_USER, // Your email id
-            pass: process.env.EMAIL_PASS // Your password
+            user: process.env.EMAIL_USER, // email id
+            pass: process.env.EMAIL_PASS // password
         }
     });
   
-  for (var i = 0; i < urls.length; i++){
-    
-    var url =
-    "https://ws.miamioh.edu/courseSectionV2/201910.json?campusCode=O&courseSubjectCode=" + 
-        urls[i][0] + "&courseNumber=" + urls[i][1] + "&courseSectionCode=" + urls[i][2];
-    axios
-    .get(url)
-    .then(response => {
-      var data = {
-        availNow: response.data.courseSections[0].enrollmentCountAvailable,
-        course: response.data.courseSections[0].courseCode
-      }
-      return data;
-    })
-    .catch(error => {
-      console.log(error);
-    }).then(data => {
-      if (data.availNow != 0){
-        var mailOptions = {
-          from: 'no-reply@andre.com', // sender address
-          to: 'leduyanh1011998@gmail.com', // list of receivers
-          subject: 'Email Example', // Subject line
-          text: 'The course ' + data.course + ' has opened more slot to ' + data.availNow 
-        };
-        // transporter.sendMail(mailOptions, function(error, info){
-        //   if(error){
-        //       console.log(error);
-        //   }else{
-        //       console.log('Message sent: ' + info.response);
-        //   };
-        // });
-      }
-    });
-    
-  }
-  var mailOptions = {
-          from: 'no-reply@andre.com', // sender address
-          to: 'leduyanh1011998@gmail.com', // list of receivers
-          subject: 'Email Example', // Subject line
-          text: 'xyz'
-        };
-    setInterval(function(){ 
-    transporter.sendMail(mailOptions, function(error, info){
-          if(error){
-              console.log(error);
-          }else{
-              console.log('Message sent: ' + info.response);
-          };
+  //go to the API and check for changes every 30 seconds
+  setInterval(function(){ 
+    for (var i = 0; i < urls.length; i++){
+
+      var url =
+      "https://ws.miamioh.edu/courseSectionV2/201910.json?campusCode=O&courseSubjectCode=" + 
+          urls[i][0] + "&courseNumber=" + urls[i][1] + "&courseSectionCode=" + urls[i][2];
+      axios
+      .get(url)
+      .then(response => {
+        var course = {
+          availNow: response.data.courseSections[0].enrollmentCountAvailable,
+          course: response.data.courseSections[0].courseCode
+        }
+        return course;
+      })
+      .catch(error => {
+        console.log(error);
+      }).then(function(course) {
+        getAvail(course).then(function(avail){
+          console.log(course.availNow + " " + avail);
+            if (course.availNow != avail){
+              var mailOptions = {
+                from: 'no-reply@andre.com', // sender address
+                to: 'lienhoa.nguyen273@gmail.com', // list of receivers
+                subject: 'Change in ' + course.course, // Subject line
+                text: 'The course ' + course.course + ' has changed the open slots from ' + avail + ' to ' + course.availNow
+              };
+              transporter.sendMail(mailOptions, function(error, info){
+                if(error){
+                    console.log(error);
+                }else{
+                    console.log('Message sent: ' + info.response);
+                };
+              });
+          }
         });
-                        }, 300000);
-  
+      });
+
+    }
+  }, 30000);
   
 }); 
 
-// function getAvail(course){
-//   MongoClient.connect(dburl, function (err, db) {
-//     if (err) {
-//       console.log('Unable to connect to the mongoDB server. Error:', err);
-//     }
-//     else {
-//       console.log('Connection established');
 
-//       var courses = db.collection('courses');
-//       courses.find({
-//         "course": course
-//       }).toArray(function(err, data){
-//         console.log(data);
-//         if (data.length == 0) {
-//           courses.insert({"course": course, }, function(err, data){
-//             if (err)
-//               console.log("Cannot insert data");
-            
-//           });
-//         }
-//         else{
-//         }
-//       });
-//     }
-    
-//   });
-// }
+//return Promise object contains data of the course
+function getAvail(course){
+  return new Promise(function(resolve, reject) {
+      MongoClient.connect(dburl, function (err, client) {
+    if (err) {
+      console.log('Unable to connect to the mongoDB server. Error:', err);
+    }
+    else {
+      var db = client.db('course-track');
+      var courses = db.collection('courses');
+      courses.find({
+        "course": course.course
+      }).toArray(function(err, data){
+        console.log(data);
+        if (data.length == 0) {
+          courses.insert({"course": course.course, "available": course.availNow} , function(err, d){
+            if (err)
+              console.log("Cannot insert data " + course.course);
+          });
+          resolve(course.availNow);
+        }
+        else{
+          courses.update({"course": course.course}, {"course": course.course, "available": course.availNow}, function(err, data){
+            if (err)
+              console.log("Cannot update data");
+          });
+          resolve(data[0].available);
+        }
+      });
+    }
+  })});
+}
+
+function insertCourse(obj){
+  MongoClient.connect(dburl, function (err, client) {
+    if (err) {
+      console.log('Unable to connect to the mongoDB server. Error:', err);
+    }
+    else {
+      console.log('Connection established');
+      var db = client.db('course-track');
+      var courses = db.collection('courses'); 
+    }    
+  });
+}
+
